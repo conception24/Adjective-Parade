@@ -20,6 +20,7 @@ function speak(card: CatCard) {
   const utterance = new SpeechSynthesisUtterance(card.sentence);
   utterance.lang = "en-US";
   utterance.rate = 0.82;
+  utterance.volume = 0.4;
   speechSynthesis.speak(utterance);
 }
 
@@ -34,7 +35,7 @@ function playCardFlipSound() {
     oscillator.frequency.setValueAtTime(620, context.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(190, context.currentTime + 0.11);
     gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.13);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start();
@@ -56,7 +57,7 @@ function playMatchSound() {
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency, start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.1, start + 0.025);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
       oscillator.connect(gain).connect(context.destination);
       oscillator.start(start);
@@ -66,16 +67,17 @@ function playMatchSound() {
   } catch { /* audio is optional when the browser blocks it */ }
 }
 
-function CardPanel({ card, compact = false }: { card: CatCard | null; compact?: boolean }) {
+function CardPanel({ card, compact = false, matchedValues = [] }: { card: CatCard | null; compact?: boolean; matchedValues?: string[] }) {
   const active = new Map(card?.values.map((value) => [VALUE_META[value].category, value]) ?? []);
-  const translation = card?.values.slice().sort((a, b) => CATEGORY_ORDER.indexOf(VALUE_META[a].category) - CATEGORY_ORDER.indexOf(VALUE_META[b].category)).map((value) => VALUE_JA[value]).join("") ?? "";
+  const orderedValues = card?.values.slice().sort((a, b) => CATEGORY_ORDER.indexOf(VALUE_META[a].category) - CATEGORY_ORDER.indexOf(VALUE_META[b].category)) ?? [];
+  const translation = orderedValues.map((value) => VALUE_JA[value]).join("");
   return <section className={`word-panel ${compact ? "compact" : ""}`} aria-label="カードの英文と属性">
-    {!compact && <div className="sentence-row"><div><p className="sentence">{card?.sentence ?? "形容詞の順番"}</p><p className="translation">{card ? `（${translation}猫。）` : "カードをめくると英文が表示されます。"}</p></div>{card && <button className="speak-button" onClick={() => speak(card)} aria-label={`${card.sentence}を音声で聞く`}>🔊<span>音声</span></button>}</div>}
+    {!compact && <div className="sentence-row"><div><p className="sentence">{card ? <>A {orderedValues.map((value) => <span key={value} className={matchedValues.includes(value) ? "matched-word" : undefined}>{VALUE_META[value].label} </span>)}cat.</> : "形容詞の順番"}</p><p className="translation">{card ? `（${translation}猫。）` : "カードをめくると英文が表示されます。"}</p></div>{card && <button className="speak-button" onClick={() => speak(card)} aria-label={`${card.sentence}を音声で聞く`}>🔊<span>音声</span></button>}</div>}
     <div className="attribute-flow">
       {CATEGORY_ORDER.map((category, index) => {
         const value = active.get(category);
         return <div className="attribute-step" key={category}>
-          <div className={`attribute ${value ? "active" : ""}`}>
+          <div className={`attribute ${value ? "active" : ""} ${value && matchedValues.includes(value) ? "matched-value" : ""}`}>
             <span>{category}</span><small>{CATEGORY_JA[category]}</small>
             {value && <strong>{VALUE_META[value].label}<em>{VALUE_JA[value]}</em></strong>}
           </div>
@@ -101,19 +103,18 @@ function GameComplete({ scores, goHome }: { scores: [number, number]; goHome: ()
 function Landing({ choose }: { choose: (mode: string) => void }) {
   return <main className="landing">
     <div className="brand-mark">A→Z</div>
-    <p className="eyebrow">英語の形容詞を、並べながら覚える</p>
     <h1>Adjective Parade</h1>
-    <p className="intro">同じ言葉を持つカードを見つける神経衰弱。猫の絵を手がかりに、英語の形容詞の順番に親しもう。</p>
+    <p className="intro">同じ形容詞を持つカードを見つける神経衰弱。美麗な絵とキャラクターを楽しく覚え、英語の形容詞の順番に親しみましょう。</p>
     <div className="role-buttons"><button className="primary" onClick={() => choose("solo")}>一人で遊ぶ<span>パソコンで20枚のカードに挑戦</span></button><button className="secondary" onClick={() => choose("rules")}>ゲーム説明<span>遊び方と形容詞の順番</span></button><button className="secondary disabled-mode" type="button" disabled aria-disabled="true">二人で遊ぶ<span>停止中</span></button></div>
   </main>;
 }
 
 function Rules({ goHome }: { goHome: () => void }) {
   return <main className="rules-screen"><div className="rules-sheet"><button className="rules-back" onClick={goHome}>← ホームへ戻る</button><p className="eyebrow">HOW TO PLAY（遊び方）</p><h1>ゲーム説明</h1>
-    <p>20枚の裏向きカードから、2枚をめくります。2枚に同じ形容詞が1つでもあればペア成立。たとえば <strong>junior（若い）・European（ヨーロッパの）</strong> と <strong>small（小さな）・junior（若い）</strong> は、junior（若い）が共通なのでペアです。</p>
+    <p>20枚の裏向きカードから、2枚をめくります。カードには形容詞が2つ、正しい順番で記載されていて、2枚に共通する形容詞が1つでもあればペア成立となります。たとえば <strong>【junior（若い）・European（ヨーロッパの）】</strong> と <strong>【small（小さな）・junior（若い）】</strong> は、<strong>【junior（若い）】</strong> が共通しているのでペアです。</p>
     <p>ペアができた2枚は盤面から取り除かれます。違う場合は内容を見てから「続ける」を押すと裏向きに戻ります。10ペア、20枚すべてを取ればクリアです。</p>
-    <p>カードの英文は、<strong>opinion（印象）→ size（大きさ）→ age（年齢）→ shape（形）→ color（色）→ origin（出身）</strong> の順で表示します。猫の絵と英文を覚えながら、形容詞の自然な並び方を繰り返し確認できます。</p>
-    <p className="rules-note">この説明文は仮案です。応募後に調整できます。</p><button className="rules-play" onClick={() => location.assign("/?mode=solo")}>一人で遊ぶ →</button>
+    <p>カードの英文は、<strong>opinion（印象）→ size（大きさ）→ age（年齢）→ shape（形）→ color（色）→ origin（出身）</strong> の順で表示します。できるだけ少ないミスでゲームをクリアするためには、すでにめくったカードの形容詞を何度も脳内で反復して忘れないようにすることが大事でしょう。そして、その反復こそが正しい形容詞の順番を覚えるサポートになります。</p>
+    <p className="rules-note">この説明文は仮案です。</p><button className="rules-play" onClick={() => location.assign("/?mode=solo")}>一人で遊ぶ →</button>
   </div></main>;
 }
 
@@ -121,6 +122,9 @@ function SoloGame({ goHome }: { goHome: () => void }) {
   const [game, setGame] = useState(() => createGame("SOLO"));
   const slots = game.slots;
   const open = game.open.map((index) => ({ index, card: publicGame(game).slots[index].card }));
+  const matchedValues = game.pendingResult === "match" && open[0]?.card && open[1]?.card
+    ? open[0].card.values.filter((value) => open[1].card?.values.includes(value))
+    : [];
   const reveal = (index: number) => {
     const next = revealCard(game, index);
     if (next === game) return;
@@ -143,7 +147,7 @@ function SoloGame({ goHome }: { goHome: () => void }) {
         {[0, 1].map((position) => {
           const item = open[position];
           return <section className={`solo-reveal selection-${position + 1}`} key={position}><h3><span>{position + 1}</span>{position + 1}枚目 {item ? <small>盤面 {String(item.index + 1).padStart(2, "0")}</small> : null}</h3>
-            {item?.card ? <div className="solo-reveal-content"><img src={item.card.image} alt={item.card.sentence} /><CardPanel card={item.card} /></div> : <div className="solo-empty">{position === 0 ? "盤面からカードを選んでください" : "2枚目を選ぶと、ここに並びます"}</div>}
+            {item?.card ? <div className="solo-reveal-content"><img src={item.card.image} alt={item.card.sentence} /><CardPanel card={item.card} matchedValues={matchedValues} /></div> : <div className="solo-empty">{position === 0 ? "盤面からカードを選んでください" : "2枚目を選ぶと、ここに並びます"}</div>}
           </section>;
         })}
         {game.pendingResult && <button className={`solo-resolve ${game.pendingResult}`} onClick={() => setGame(resolveTurn(game))}><strong>{game.pendingResult === "match" ? "MATCH!（ペア成立）" : "MISMATCH（不一致）"}</strong><span>確認して続ける →</span></button>}
